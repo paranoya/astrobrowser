@@ -7,6 +7,7 @@ from astropy.io import fits
 from astropy.table import Table
 from astropy.utils import data
 
+from time import time
 import requests
 import ipywidgets as widgets
 from IPython.display import display
@@ -164,7 +165,7 @@ class DataExplorer(object):
         
         self.catalogue = catalogue
         self.requested_map = requested_map
-        fig_name = 'AstroBrowser Data Explorer'
+        fig_name = 'AstroBrowser Data Explorer -- Notebook edition'
         plt.close(fig_name)
         self.fig = plt.figure(fig_name, figsize=(12, 6))
         axes = self.fig.subplots(nrows=1, ncols=2, squeeze=False, gridspec_kw={'width_ratios': [1, .05], 'hspace': 0, 'wspace': 0})
@@ -189,15 +190,20 @@ class DataExplorer(object):
 
 
     def update(self, galaxy_index, requested_map):
+        t0 = time()
         galaxy = self.catalogue[galaxy_index]
         self.fig.suptitle(galaxy['ID'])
+        print(f"Downloading {requested_map} for {galaxy['ID']}; please be patient ...")
         
         skymaps = get_available_images(galaxy['RA'], galaxy['DEC'], galaxy['RADIUS_ARCSEC']/3600, galaxy['RADIUS_ARCSEC']/3600)
         self.widget.children[1].options = [x for x in skymaps]
-        print(requested_map)
         
         img = get_cutout(skymaps[requested_map], galaxy['RA'], galaxy['DEC'], galaxy['RADIUS_ARCSEC'], galaxy['PIXEL_SIZE_ARCSEC'])
-        norm = colors.SymLogNorm(linthresh=np.abs(np.nanmedian(img)), vmin=np.nanmin(img), vmax=np.nanmax(img))
+        linthresh = np.abs(np.nanmedian(img))
+        if linthresh > 0:
+            norm = colors.SymLogNorm(linthresh=np.abs(np.nanmedian(img)), vmin=np.nanmin(img), vmax=np.nanmax(img))
+        else:
+            norm = colors.Normalize()
 
         #intensity, variance, index, area, weight, filtered_img = light_growth_curve(img)
         
@@ -209,6 +215,7 @@ class DataExplorer(object):
         ax.scatter(img.shape[1]/2, img.shape[0]/2, marker='+', c='k')
 
         self.fig.set_tight_layout(True)
+        print(f'Done! ({time()-t0:.3g} s)')
 
         '''
         ax = self.ax2
