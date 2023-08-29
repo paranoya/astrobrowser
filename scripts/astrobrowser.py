@@ -1,11 +1,13 @@
 import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib import colors
+
+from scipy import ndimage
 from astropy.io import fits
 from astropy.table import Table
 from astropy.utils import data
+
 import requests
-from scipy import ndimage
-from matplotlib import pyplot as plt
-from matplotlib import colors
 import ipywidgets as widgets
 from IPython.display import display
 
