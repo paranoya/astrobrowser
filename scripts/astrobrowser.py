@@ -4,6 +4,7 @@ from matplotlib import colors
 
 from scipy import ndimage
 from astropy.io import fits
+from astropy.wcs import WCS
 from astropy.table import Table
 from astropy.utils import data
 
@@ -52,13 +53,17 @@ def get_available_images(ra_deg, dec_deg, radius_deg, max_pixel_deg=np.inf):
 def get_cutout(skymap, ra_deg, dec_deg, radius_arcsec, pixel_arcsec):
     """Retrieve a cutout from a public HiPS map"""
 
+    print(f"http://localhost:4000/api/cutout?"
+                    +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
+                    +f"&radeg={ra_deg}&decdeg={dec_deg}"
+                    +f"&hipsbaseuri={skymap['hips_service_url']}")
     with data.conf.set_temp('remote_timeout', 30):
         hdu = fits.open(f"http://localhost:4000/api/cutout?"
                     +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
                     +f"&radeg={ra_deg}&decdeg={dec_deg}"
                     +f"&hipsbaseuri={skymap['hips_service_url']}",
                     ignore_missing_simple=True)
-    return hdu[0].data
+    return hdu[0].header, hdu[0].data
 
 #%% ----------------------------------------------------------------------------
 
@@ -172,6 +177,10 @@ class DataExplorer(object):
         self.ax1 = axes[0, 0]
         self.ax1_cb = axes[0, 1]
         self.fig.set_tight_layout(True)
+        
+        self.header = None
+        self.data = None
+        self.galaxy_index = None
 
         self.widget = widgets.interactive(
             self.update,
@@ -191,6 +200,7 @@ class DataExplorer(object):
 
     def update(self, galaxy_index, requested_map):
         t0 = time()
+        self.galaxy_index = galaxy_index
         galaxy = self.catalogue[galaxy_index]
         self.fig.suptitle(galaxy['ID'])
         print(f"Downloading {requested_map} for {galaxy['ID']}; please be patient ...")
@@ -198,7 +208,9 @@ class DataExplorer(object):
         skymaps = get_available_images(galaxy['RA'], galaxy['DEC'], galaxy['RADIUS_ARCSEC']/3600, galaxy['RADIUS_ARCSEC']/3600)
         self.widget.children[1].options = [x for x in skymaps]
         
-        img = get_cutout(skymaps[requested_map], galaxy['RA'], galaxy['DEC'], galaxy['RADIUS_ARCSEC'], galaxy['PIXEL_SIZE_ARCSEC'])
+        self.header, self.data = get_cutout(skymaps[requested_map], galaxy['RA'], galaxy['DEC'], galaxy['RADIUS_ARCSEC'], galaxy['PIXEL_SIZE_ARCSEC'])
+        self.wcs = WCS(self.header)
+        img = self.data
         linthresh = np.abs(np.nanmedian(img))
         if linthresh > 0:
             norm = colors.SymLogNorm(linthresh=np.abs(np.nanmedian(img)), vmin=np.nanmin(img), vmax=np.nanmax(img))
@@ -208,7 +220,11 @@ class DataExplorer(object):
         #intensity, variance, index, area, weight, filtered_img = light_growth_curve(img)
         
         ax = self.ax1
-        ax.clear()
+        #ax.clear()
+        axis_pars = ax.get_subplotspec()
+        ax.remove()
+        ax = self.fig.add_subplot(axis_pars, projection=self.wcs)
+        self.ax1 = ax
         im = ax.imshow(img, interpolation='nearest', origin='lower', cmap='ocean', norm=norm)
         cb = plt.colorbar(im, cax=self.ax1_cb, shrink=.7, orientation='vertical')
         cb.ax.tick_params(labelsize='small')
