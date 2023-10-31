@@ -50,20 +50,27 @@ def get_available_images(ra_deg, dec_deg, radius_deg, max_pixel_deg=np.inf):
 #%% ----------------------------------------------------------------------------
 
 
-def get_cutout(skymap, ra_deg, dec_deg, radius_arcsec, pixel_arcsec):
+def get_cutout(hips_service_url, ra_deg, dec_deg, radius_arcsec, pixel_arcsec):
     """Retrieve a cutout from a public HiPS map"""
 
     print(f"http://localhost:4000/api/cutout?"
                     +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
                     +f"&radeg={ra_deg}&decdeg={dec_deg}"
-                    +f"&hipsbaseuri={skymap['hips_service_url']}")
+                    +f"&hipsbaseuri={hips_service_url}")
     with data.conf.set_temp('remote_timeout', 30):
-        hdu = fits.open(f"http://localhost:4000/api/cutout?"
-                    +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
-                    +f"&radeg={ra_deg}&decdeg={dec_deg}"
-                    +f"&hipsbaseuri={skymap['hips_service_url']}",
-                    ignore_missing_simple=True)
-    return hdu[0].header, hdu[0].data
+        try:
+            hdu = fits.open(f"http://localhost:4000/api/cutout?"
+                        +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
+                        +f"&radeg={ra_deg}&decdeg={dec_deg}"
+                        +f"&hipsbaseuri={hips_service_url}",
+                        ignore_missing_simple=True)
+        except:
+            print('ERROR: could not download cutout (most likely, timeout) :^(')
+            hdu = None
+    if hdu is None:
+        return None, None
+    else:
+        return hdu[0].header, hdu[0].data
 
 #%% ----------------------------------------------------------------------------
 
@@ -208,7 +215,7 @@ class DataExplorer(object):
         skymaps = get_available_images(galaxy['RA'], galaxy['DEC'], galaxy['RADIUS_ARCSEC']/3600, galaxy['RADIUS_ARCSEC']/3600)
         self.widget.children[1].options = [x for x in skymaps]
         
-        self.header, self.data = get_cutout(skymaps[requested_map], galaxy['RA'], galaxy['DEC'], galaxy['RADIUS_ARCSEC'], galaxy['PIXEL_SIZE_ARCSEC'])
+        self.header, self.data = get_cutout(skymaps[requested_map]['hips_service_url'], galaxy['RA'], galaxy['DEC'], galaxy['RADIUS_ARCSEC'], galaxy['PIXEL_SIZE_ARCSEC'])
         self.wcs = WCS(self.header)
         img = self.data
         linthresh = np.abs(np.nanmedian(img))
@@ -229,7 +236,8 @@ class DataExplorer(object):
         cb = plt.colorbar(im, cax=self.ax1_cb, shrink=.7, orientation='vertical')
         cb.ax.tick_params(labelsize='small')
         ax.scatter(img.shape[1]/2, img.shape[0]/2, marker='+', c='k')
-
+        ax.coords.grid(color='white', alpha=0.5, linestyle='solid')
+        
         self.fig.set_tight_layout(True)
         print(f'Done! ({time()-t0:.3g} s)')
 
