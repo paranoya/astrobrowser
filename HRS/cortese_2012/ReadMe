@@ -1,0 +1,159 @@
+UV and optical photometry and structural parameters of the HRS (Cortese+, 2012)
+================================================================================
+The GALEX view of the Herschel Reference Survey
+Ultraviolet structural properties of nearby galaxies
+	Cortese L., Boissier S., Boselli A., 
+	Bendo G. J., Buat V., Davies J.I. Eales S., 
+	Heinis S., Isaak K. G., Madden S. C.
+      <Astron. Astrophys. in press (2012)>
+================================================================================
+ADC_Keywords: Galaxies, photometry ; Photometry, UV; Photometry, optical
+Keywords: Catalogs - Galaxies: evolution - Galaxies: photometry - 
+          Galaxies: structure - Ultraviolet: galaxies
+
+Abstract:
+  We present GALEX far-ultraviolet (FUV) and near-ultraviolet (NUV) as well as SDSS 
+  g, r, i photometry and structural parameters for the Herschel Reference Survey, 
+  a magnitude-, volume-limited sample of nearby galaxies in different environments. 
+  We use this unique dataset to investigate the ultraviolet (UV) structural scaling 
+  relations of nearby galaxies and to determine how the properties of the UV disk 
+  vary with atomic hydrogen content and environment. We find a clear change of slope 
+  in the stellar mass vs. effective surface brightness relation when moving from 
+  the optical to the UV, with more massive galaxies having brighter optical but 
+  fainter UV surface brightnesses than smaller systems. A similar change of slope 
+  is also seen in the radius vs. surface brightness relation. By comparing our 
+  observations with the predictions of a simple multi-zone chemical model of galaxy 
+  evolution, we show that these findings are a natural consequence of a much more 
+  efficient inside-out growth of the stellar disk in massive galaxies. 
+  
+  We confirm that isophotal radii are always a better proxy for the size of the 
+  stellar/star-forming disk than effective quantities and we show that the extent 
+  of the UV disk (normalized to the optical size) is strongly correlated to the 
+  integrated HI gas fraction. This relation still holds even when cluster spirals 
+  are considered, with HI-deficient systems having less extended star-forming 
+  disks than HI-normal galaxies. Interestingly, the star formation in the inner 
+  part of HI-deficient galaxies is significantly less affected by the removal 
+  of the atomic hydrogen, as expected in a simple ram-pressure stripping scenario. 
+  These results suggest that it is the amount of HI that regulates 
+  the growth of the star-forming disk in the outskirts of galaxies. 
+
+    
+    
+
+Description:
+    FUV, NUV, g, r and i photometric parameters for the 323 nearby 
+    galaxies in the Herschel Reference Survey.
+    
+    PLEASE, READ THE PAPER AND THE NOTES ON INDIVIDUAL OBJECTS IN 
+    THE APPENDIX BEFORE USING THESE TABLES!
+    
+    
+Updates:	v1.0 - June 2012 data published on A&A and HeDam    
+    
+
+File Summary:
+--------------------------------------------------------------------------------
+ FileName         Explanations
+--------------------------------------------------------------------------------
+ReadMe            This file
+table1.dat        General properties and UV tiles
+table2.dat        Integrated FUV, NUV, g, r, i magnitudes
+table3.dat        FUV, NUV, g, r, i structural parameters
+--------------------------------------------------------------------------------
+
+
+Description of file: table1.dat
+--------------------------------------------------------------------------------
+Column ID	Units		Description
+--------------------------------------------------------------------------------
+HRS		---		HRS (Boselli et al. 2010) identifier
+CGCG		---		CGCG name
+VCC		---		VCC name
+UGC		---		UGC name
+NGC		---		NGC name
+IC		---		IC name
+R.A.		hh:mm:ss.ss	J.2000 Right Ascension
+Dec.		dd:mm:ss.s	J.2000 Declination
+Type		---		Morphological type (1)
+D_25		arcmin		Optical diameter
+E(B-V)          mag		E(B-V) obtained from the Schlegel et al. 1998 maps
+Dist.		Mpc		Distance
+Tile-Name_NUV   ---             Name of the GALEX NUV tile            
+texp_NUV        sec		Exposure time for the GALEX NUV tile
+Tile-Name_FUV   ---             Name of the GALEX FUV tile  
+texp_FUV        sec		Exposure time for the GALEX FUV tile
+NOTE 		---		Note explaining why GALEX data where not used (2)
+--------------------------------------------------------------------------------
+Note (1): Morphological types: -2=dE/dS0, 0=E-E/S0, 1=S0, 2=S0a-S0/Sa, 3=Sa, 4=Sab, 
+5=Sb, 6=Sbc, 7=Sc, 8=Scd, 9=Sd, 10=Sdm-Sd/Sm, 11=Sm, 12=Im, 13=Pec, 14=S/BCD, 
+15=Sm/BCD, 16=Im/BCD, 17=BCD.
+Note (2): S=observations were not possible due to bright stars; E=the target was 
+too close to the edge of the field; F=the frame was too shallow to be used 
+for reliable photometry; N=the galaxy was not observed.
+--------------------------------------------------------------------------------
+
+Description of file: table2.dat
+--------------------------------------------------------------------------------
+Column ID	Units		Description
+--------------------------------------------------------------------------------
+HRS		---		HRS (Boselli et al. 2010) identifier
+e		---		Ellipticity used for the surface brightness 
+				profile fitting.
+PA		deg		Position angle measured counterclockwise 
+				from the North				
+FUV_asy       	mag		FUV asymptotic magnitude
+eFUV_asy     	mag		Uncertainty on FUV_asy (1)
+FUV_D25       	mag		FUV magnitude measured within D_25
+eFUV_D25     	mag		Uncertainty on FUV_D25 
+NUV_asy       	mag		NUV asymptotic magnitude
+eNUV_asy     	mag		Uncertainty on NUV_asy (1)
+NUV_D25       	mag		NUV magnitude measured within D_25
+eNUV_D25     	mag		Uncertainty on NUV_D25 
+g_asy         	mag		g asymptotic magnitude
+eg_asy       	mag		Uncertainty on g_asy (1)
+g_D25         	mag		g magnitude measured within D_25
+eg_D25       	mag		Uncertainty on g_D25 
+r_asy         	mag		r asymptotic magnitude
+er_asy       	mag		Uncertainty on r_asy (1)
+r_D25         	mag		r magnitude measured within D_25
+er_D25       	mag		Uncertainty on r_D25 
+i_asy         	mag		i asymptotic magnitude
+ei_asy       	mag		Uncertainty on i_asy (1)
+i_D25         	mag		i magnitude measured within D_25
+ei_D25          mag		Uncertainty on i_D25 
+log(M*) 	log(Msol)	Stellar mass (2)
+--------------------------------------------------------------------------------
+Note (1): This is the uncertainty obtained from the best fit of the growth 
+curve.
+Note (2): Stellar masses determined from i-band luminosities L_i using the g-i 
+colour-dependent stellar mass-to-light ratio relation from Zibetti et al. (2009)
+assuming a Chabrier (2003) initial mass function: log(M*/L_i)=-0.963+1.032*(g-i). 
+The i luminosity and g-i colour have been corrected  for Galactic extinction 
+assuming a Cardelli et al. (1989) extinction law with A(V)/E(B-V)=3.1: 
+i.e., A(lambda)/E(B-V)=3.793 and 2.086 for g and i, respectively. 
+--------------------------------------------------------------------------------
+
+Description of file: table3.dat
+--------------------------------------------------------------------------------
+Column ID	Units		Description
+--------------------------------------------------------------------------------
+HRS		---		HRS (Boselli et al. 2010) identifier          
+Re_FUV          arcsec          FUV effective radius
+RISO_FUV        arcsec		FUV isophotal radius at 28 mag/arcsec^2	
+mue_FUV         mag/arcsec^2 	FUV effective surface brightness
+Re_NUV          arcsec          NUV effective radius
+RISO_NUV        arcsec		NUV isophotal radius at 28 mag/arcsec^2	
+mue_NUV         mag/arcsec^2	NUV effective surface brightness
+Re_g            arcsec          g effective radius
+RISO_g          arcsec		g isophotal radius at 24.5 mag/arcsec^2	
+mue_g           mag/arcsec^2	g effective surface brightness
+Re_r            arcsec          r effective radius
+RISO_r        	arcsec		r isophotal radius at 24 mag/arcsec^2	
+mue_r           mag/arcsec^2	r effective surface brightness
+Re_i            arcsec          i effective radius
+RISO_i          arcsec		i isophotal radius at 23.5 mag/arcsec^2	
+mue_i		mag/arcsec^2	i effective surface brightness
+--------------------------------------------------------------------------------
+
+================================================================================
+(End)                            Luca Cortese [ESO]                  05-Jun-2012
