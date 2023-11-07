@@ -7,11 +7,75 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.table import Table
 from astropy.utils import data
+from astropy import units as u
+from photutils.aperture import SkyEllipticalAperture
 
 from time import time
 import requests
 import ipywidgets as widgets
 from IPython.display import display
+
+#%% ----------------------------------------------------------------------------
+
+
+def find_bg(data):
+    p16, p50 = np.nanpercentile(data, [16, 50])
+    mu0 = p50
+    sigma0 = p50 - p16
+    weight = np.exp(-.5 * ((data - mu0) / sigma0)**2)
+    total_weight = np.nansum(weight)
+    mu1 = np.nansum(weight * data) / total_weight
+    sigma1 = np.nansum(weight * data**2) / total_weight
+    sigma1 = np.sqrt(sigma1 - mu1**2)
+    print(mu0, sigma0)
+    print(mu1, sigma1)
+    #ivar = 1/sigma1**2 - 1/sigma0**2
+    #mu = (mu1/sigma1**2 - mu0/sigma0**2) / ivar
+    #print(mu, np.sqrt(1/ivar))
+    #return mu, np.sqrt(1/ivar)
+    return mu1, sigma1
+
+
+#%% ----------------------------------------------------------------------------
+
+
+def aperture_photometry(hips_service_url, skymap_units, position, a, b, PA, desired_area=100, min_pixel=1*u.arcsec, max_pixel=30*u.arcsec, fig=None):
+    """Download a HiPS cutout to compute flux and error for a specified elliptical aperture"""
+
+    cutout_pixel = np.clip(np.sqrt(a*b / desired_area), min_pixel, max_pixel)
+    pixel_area = cutout_pixel**2  * np.cos(position.dec)  # due to Mercator projection
+    unit_conversion = skymap_units * pixel_area
+
+    print(f"> Downloading... (please be patient)")
+    header, data = get_cutout(hips_service_url, position.ra.deg, position.dec.deg, 2*a.to_value(u.arcsec), cutout_pixel.to_value(u.arcsec))
+    if header is None:
+        return np.nan*u.Jy, np.nan*u.Jy
+
+    aperture = SkyEllipticalAperture(position, a=a, b=b, theta=PA)  # Why do I have to invert PA?
+    wcs = WCS(header)
+    pixel_aperture = aperture.to_pixel(wcs)
+    pixel_aperture.positions = [np.array(data.shape) / 2]  # dirty fix
+
+    flux = pixel_aperture.do_photometry(data)[0][0]
+    mean = flux / pixel_aperture.area
+    bg, bg_err = find_bg(data)
+
+    corrected_flux = (flux - bg * pixel_aperture.area) * unit_conversion
+    flux_err = bg_err * pixel_aperture.area * unit_conversion
+    print(f'  area = {pixel_aperture.area:.2f}, mean({mean:.3g}) - bg ({bg:.3g}) = {mean-bg:.3g} +- {bg_err:.3g}')
+    print(f'  flux = {corrected_flux:.3g} +- {flux_err:.3g} ({flux:.3g})')
+
+    if fig is not None:
+        im = plt.imshow(data, interpolation='nearest', origin='lower', vmin=bg-bg_err, vmax=mean+bg_err, cmap='terrain')
+        plt.contour(data, levels=[mean], colors=['k'])
+        pixel_aperture.plot(color='w')
+        cb = plt.colorbar(im)
+        cb.ax.axhline(mean, c='k')
+        cb.ax.axhline(bg + bg_err, c='w', ls=':')
+        cb.ax.axhline(bg, c='w', ls='-')
+        cb.ax.axhline(bg - bg_err, c='w', ls=':')
+        
+    return corrected_flux, flux_err
 
 #%% ----------------------------------------------------------------------------
 
