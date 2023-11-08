@@ -51,6 +51,7 @@ def aperture_photometry(hips_service_url, skymap_units, position, a, b, PA, desi
     if header is None:
         return np.nan*u.Jy, np.nan*u.Jy
 
+    '''
     aperture = SkyEllipticalAperture(position, a=a, b=b, theta=PA)  # Why do I have to invert PA?
     wcs = WCS(header)
     pixel_aperture = aperture.to_pixel(wcs)
@@ -64,18 +65,80 @@ def aperture_photometry(hips_service_url, skymap_units, position, a, b, PA, desi
     flux_err = bg_err * pixel_aperture.area * unit_conversion
     print(f'  area = {pixel_aperture.area:.2f}, mean({mean:.3g}) - bg ({bg:.3g}) = {mean-bg:.3g} +- {bg_err:.3g}')
     print(f'  flux = {corrected_flux:.3g} +- {flux_err:.3g} ({flux:.3g})')
+    '''
 
+    # Aperture:
+    c = np.cos(-PA)
+    s = np.sin(-PA)
+    a_deg = a.to_value(u.deg)
+    a_y = a_deg * c / header['CDELT2']
+    a_x = a_deg * s / header['CDELT1']
+    a_pix2 = a_x**2 + a_y**2
+    b_deg = b.to_value(u.deg)
+    b_y = b_deg * s / header['CDELT2']
+    b_x = - b_deg * c / header['CDELT1']
+    b_pix2 = b_x**2 + b_y**2
+    x = np.arange(data.shape[1]) - header['CRPIX1']
+    y = np.arange(data.shape[0]) - header['CRPIX2']
+    r2 = ((x[np.newaxis, :]*a_x + y[:, np.newaxis]*a_y) / a_pix2)**2
+    r2 += ((x[np.newaxis, :]*b_x + y[:, np.newaxis]*b_y) / b_pix2)**2
+
+    aperture = (r2 < 1.)
+    n_aperture = np.count_nonzero(aperture)
+    bg_weight = np.where(np.isfinite(data) & ~aperture, 1., 0.)
+    bg_image = np.where(np.isfinite(data), bg_weight*data, 0.)
+    smoothing_radius = float(.5*b/cutout_pixel)
+    bg_weight = ndimage.gaussian_filter(bg_weight, smoothing_radius)
+    bg_image = ndimage.gaussian_filter(bg_image, smoothing_radius) / bg_weight
+
+    flux = np.nansum((data - bg_image)[aperture]) * unit_conversion.to_value(u.Jy)
+    mean = np.nanmean((data-bg_image)[aperture])
+    mean_err = np.nanstd(data[aperture]) / np.sqrt(n_aperture)
+    bg = np.nansum(bg_image[aperture]) / n_aperture
+    #bg2 = np.nansum((1-bg_weight)*bg_image**2) / total_img_weight
+    #bg_err = total_img_weight * np.sqrt((bg2 - bg**2)) * unit_conversion.to_value(u.Jy)
+    p16, p50, p84 = np.nanpercentile(bg_image[aperture], [16, 50, 84])
+    bg_err = (p84 - p16) / 2
+    bg_err /= np.sqrt(np.sum(bg_weight[aperture]))
+    flux_err = n_aperture * np.sqrt(bg_err**2 + mean_err**2) * unit_conversion.to_value(u.Jy)
+    
+    delta = (p84 - p16) / 2
     if fig is not None:
-        im = plt.imshow(data, interpolation='nearest', origin='lower', vmin=bg-bg_err, vmax=mean+bg_err, cmap='terrain')
-        plt.contour(data, levels=[mean], colors=['k'])
-        pixel_aperture.plot(color='w')
-        cb = plt.colorbar(im)
+        axes = fig.subplots(nrows=1, ncols=3, squeeze=False)
+        
+        ax = axes[0, 0]
+        ax.set_title(f'original: {n_aperture} pix arerture {mean_err:.3g}')
+        im = ax.imshow(data, interpolation='nearest', origin='lower', vmin=bg-3*delta, vmax=bg+6*delta, cmap='terrain')
+        ax.contour(aperture, levels=[0.5], colors=['k'])
+        cb = plt.colorbar(im, ax=ax, shrink=.7)
+        cb.ax.tick_params(labelsize='small')
+        '''
         cb.ax.axhline(mean, c='k')
+        cb.ax.axhline(bg + bg_err, c='y', ls=':')
         cb.ax.axhline(bg + bg_err, c='w', ls=':')
         cb.ax.axhline(bg, c='w', ls='-')
+        cb.ax.axhline(bg, c='y', ls='-')
         cb.ax.axhline(bg - bg_err, c='w', ls=':')
+        '''
         
-    return corrected_flux, flux_err
+        ax = axes[0, 1]
+        ax.set_title(f'background: [{p16:.4g}, {p50:.4g}, {p84:.4g}]')
+        im = ax.imshow(bg_image, interpolation='nearest', origin='lower', vmin=bg-3*delta, vmax=bg+6*delta, cmap='terrain')
+        ax.contour(aperture, levels=[0.5], colors=['k'])
+        cb = plt.colorbar(im, ax=ax, shrink=.7)
+        cb.ax.tick_params(labelsize='small')
+
+        ax = axes[0, 2]
+        ax.set_title(f'subtracted {mean:.4g} $\pm$ {bg_err:.3g}')
+        im = ax.imshow(data - bg_image, interpolation='nearest', origin='lower', cmap='terrain', vmin=-3*delta, vmax=6*delta)#, vmin=bg-bg_err, vmax=mean+bg_err)
+        ax.contour(aperture, levels=[0.5], colors=['k'])
+        cb = plt.colorbar(im, ax=ax, shrink=.7)
+        cb.ax.tick_params(labelsize='small')
+        cb.ax.axhline(mean, c='k')
+        cb.ax.axhline(bg_err, c='w', ls=':')
+        
+    #return corrected_flux, flux_err
+    return flux*u.Jy, flux_err*u.Jy
 
 #%% ----------------------------------------------------------------------------
 
@@ -121,7 +184,7 @@ def get_cutout(hips_service_url, ra_deg, dec_deg, radius_arcsec, pixel_arcsec):
                     +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
                     +f"&radeg={ra_deg}&decdeg={dec_deg}"
                     +f"&hipsbaseuri={hips_service_url}")
-    with data.conf.set_temp('remote_timeout', 30):
+    with data.conf.set_temp('remote_timeout', 10):
         try:
             hdu = fits.open(f"http://localhost:4000/api/cutout?"
                         +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
@@ -134,6 +197,9 @@ def get_cutout(hips_service_url, ra_deg, dec_deg, radius_arcsec, pixel_arcsec):
     if hdu is None:
         return None, None
     else:
+        #print('\n---\n', hdu[0].header)
+        hdu[0].verify('fix')
+        #print('\n---\n', hdu[0].header)
         return hdu[0].header, hdu[0].data
 
 #%% ----------------------------------------------------------------------------
