@@ -92,50 +92,54 @@ def aperture_photometry(hips_service_url, skymap_units, position, a, b, PA, desi
     bg_image = ndimage.gaussian_filter(bg_image, smoothing_radius) / bg_weight
 
     flux = np.nansum((data - bg_image)[aperture]) * unit_conversion.to_value(u.Jy)
-    mean = np.nanmean((data-bg_image)[aperture])
+    original_mean = np.nanmean(data[aperture])
+    original_std = np.nanstd(data[aperture])
+    subtracted_mean = np.nanmean((data-bg_image)[aperture])
+    subtracted_std = np.sqrt(np.nanmean((data-bg_image)[aperture & (data > bg_image + subtracted_mean)]**2))
     mean_err = np.nanstd(data[aperture]) / np.sqrt(n_aperture)
-    bg = np.nansum(bg_image[aperture]) / n_aperture
-    #bg2 = np.nansum((1-bg_weight)*bg_image**2) / total_img_weight
-    #bg_err = total_img_weight * np.sqrt((bg2 - bg**2)) * unit_conversion.to_value(u.Jy)
-    p16, p50, p84 = np.nanpercentile(bg_image[aperture], [16, 50, 84])
-    bg_err = (p84 - p16) / 2
-    bg_err /= np.sqrt(np.sum(bg_weight[aperture]))
-    flux_err = n_aperture * np.sqrt(bg_err**2 + mean_err**2) * unit_conversion.to_value(u.Jy)
+    bg = np.nanmean(bg_image[aperture])
+    bg_var = max(
+        np.nanvar(bg_image[aperture]),
+        np.nanmean((bg_image - data)[aperture & (bg_image > data)]**2)
+    )
+    bg_err = np.sqrt(bg_var / np.sum(bg_weight[aperture]))
+    subtracted_err = np.sqrt(bg_err**2 + mean_err**2)
+    flux_err = n_aperture * subtracted_err * unit_conversion.to_value(u.Jy)
     
-    delta = (p84 - p16) / 2
+    bg_std = np.sqrt(bg_var)
     if fig is not None:
         axes = fig.subplots(nrows=1, ncols=3, squeeze=False)
         
         ax = axes[0, 0]
-        ax.set_title(f'original: {n_aperture} pix arerture {mean_err:.3g}')
-        im = ax.imshow(data, interpolation='nearest', origin='lower', vmin=bg-3*delta, vmax=bg+6*delta, cmap='terrain')
+        ax.set_title(f'original: {original_mean:.3g} $\pm$ {mean_err:.3g} ({original_std:.3g})')
+        im = ax.imshow(data, interpolation='nearest', origin='lower', vmin=bg-3*bg_std, vmax=bg+6*bg_std, cmap='terrain')
         ax.contour(aperture, levels=[0.5], colors=['k'])
         cb = plt.colorbar(im, ax=ax, shrink=.7)
         cb.ax.tick_params(labelsize='small')
-        '''
-        cb.ax.axhline(mean, c='k')
-        cb.ax.axhline(bg + bg_err, c='y', ls=':')
-        cb.ax.axhline(bg + bg_err, c='w', ls=':')
-        cb.ax.axhline(bg, c='w', ls='-')
-        cb.ax.axhline(bg, c='y', ls='-')
-        cb.ax.axhline(bg - bg_err, c='w', ls=':')
-        '''
+        cb.ax.axhline(original_mean+original_std, c='k', ls=':')
+        cb.ax.axhline(original_mean, c='k', ls='-')
+        cb.ax.axhline(original_mean-original_std, c='k', ls=':')
         
         ax = axes[0, 1]
-        ax.set_title(f'background: [{p16:.4g}, {p50:.4g}, {p84:.4g}]')
-        im = ax.imshow(bg_image, interpolation='nearest', origin='lower', vmin=bg-3*delta, vmax=bg+6*delta, cmap='terrain')
+        #ax.set_title(f'background: [{p16:.4g}, {p50:.4g}, {p84:.4g}]')
+        ax.set_title(f'background: {bg:.3g} $\pm$ {bg_err:.3g} ({bg_std:.3g})')
+        im = ax.imshow(bg_image, interpolation='nearest', origin='lower', vmin=bg-3*bg_std, vmax=bg+6*bg_std, cmap='terrain')
         ax.contour(aperture, levels=[0.5], colors=['k'])
         cb = plt.colorbar(im, ax=ax, shrink=.7)
         cb.ax.tick_params(labelsize='small')
+        cb.ax.axhline(bg + bg_std, c='w', ls=':')
+        cb.ax.axhline(bg, c='w', ls='-')
+        cb.ax.axhline(bg - bg_std, c='w', ls=':')
 
         ax = axes[0, 2]
-        ax.set_title(f'subtracted {mean:.4g} $\pm$ {bg_err:.3g}')
-        im = ax.imshow(data - bg_image, interpolation='nearest', origin='lower', cmap='terrain', vmin=-3*delta, vmax=6*delta)#, vmin=bg-bg_err, vmax=mean+bg_err)
+        ax.set_title(f'subtracted {subtracted_mean:.4g} $\pm$ {subtracted_err:.3g} ({subtracted_std:.3g})')
+        im = ax.imshow(data - bg_image, interpolation='nearest', origin='lower', cmap='terrain', vmin=-3*bg_std, vmax=6*bg_std)#, vmin=bg-bg_err, vmax=mean+bg_err)
         ax.contour(aperture, levels=[0.5], colors=['k'])
         cb = plt.colorbar(im, ax=ax, shrink=.7)
         cb.ax.tick_params(labelsize='small')
-        cb.ax.axhline(mean, c='k')
-        cb.ax.axhline(bg_err, c='w', ls=':')
+        cb.ax.axhline(subtracted_std, c='k', ls=':')
+        cb.ax.axhline(subtracted_mean, c='k')
+        cb.ax.axhline(bg_std, c='w', ls=':')
         
     #return corrected_flux, flux_err
     return flux*u.Jy, flux_err*u.Jy
@@ -190,15 +194,14 @@ def get_cutout(hips_service_url, ra_deg, dec_deg, radius_arcsec, pixel_arcsec):
                         +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
                         +f"&radeg={ra_deg}&decdeg={dec_deg}"
                         +f"&hipsbaseuri={hips_service_url}",
-                        ignore_missing_simple=True)
+                        ignore_missing_simple=True, mode='readonly')
         except:
             print('ERROR: could not download cutout (most likely, timeout) :^(')
             hdu = None
     if hdu is None:
         return None, None
     else:
-        #print('\n---\n', hdu[0].header)
-        hdu[0].verify('fix')
+        #hdu[0].verify('fix')
         #print('\n---\n', hdu[0].header)
         return hdu[0].header, hdu[0].data
 
