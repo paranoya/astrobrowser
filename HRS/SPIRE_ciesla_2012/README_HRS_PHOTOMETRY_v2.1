@@ -1,0 +1,220 @@
+====================================================================================
+======================= HRS PHOTOMETRY README FILE =================================
+====================================================================================
+
+------ by Laure Ciesla, November 2011
+
+
+Table:	2.1 release: November 2011: Updates on beamsizes and corrections for extended sources (from George Bendo's Cookbook July 2011 version). New estimation of the statistical error. New estimation of PSF fitting on timeline data error. New definition of the aperture for the calculation of upper limits. Refinements of particular galaxies.
+		
+This README file comes with the table "HRS_PHOTOMETRY" containing the flux densities of the 323 galaxies of HRS. 
+
+We used aperture photometry for extended galaxies and a timeline PSFfitting method (provided by George Bendo) for point like sources.
+Flux densities are in mJy.
+
+* HOW TO READ THE TABLE:
+------------------------
+Each wavelength has a flag:
+
+0 -> nondetection. The method used is detailed below.
+1 -> detection. The method used is the aperture photometry.
+2 -> point like sources. The method used is the timeline PSFfitting.
+3 -> overestimation of the flux density due to the presence of a background source or a companion galaxy.
+4 -> presence of Galactic cirri.
+
+Each galaxy has a global flag:
+
+- -> no particular problem with the photometry of the galaxy
+* -> particular case; please refer to the end of this document where each particular case is described.
+
+* COLUMNS DESCRIPTION:
+----------------------
+
+1 -> HRS name
+2 -> CGCG name
+3 -> VCC name
+4 -> UGC name 
+5 -> NGC name
+6 -> IC name
+7 -> Ra
+8 -> Dec
+9 -> a : semi-major IR axis in arcsec
+10 -> b : semi-minor IR axis in arcsec
+11 -> PA: position angle of the region used for aperture photometry in degree
+12 -> Flag250: Flag of the 250 microns flux density (0: nondetection, 1:detection, 2: point like source, 3: overestimation of the flux density, 4: presence of a Galactic cirri).
+13 -> S250: Flux density at 250 microns
+14 -> error_tot250: Total error on the flux density at 250 microns
+15 -> Flag350: Flag of the 350 microns flux density (0: nondetection, 1:detection, 2: point like source, 3: overestimation of the flux density, 4: presence of a Galactic cirri).
+16 -> S350: Flux density at 350 microns
+17 -> error_tot350: Total error on the flux density at 350 microns
+18 -> Flag500: Flag of the 500 microns flux density (0: nondetection, 1:detection, 2: point like source, 3: overestimation of the flux density, 4: presence of a Galactic cirri).
+19 -> S500: Flux density at 500 microns
+20 -> error_tot500: Total error on the flux density at 500 microns
+21 -> Npixels250: number of pixels in the 250 microns aperture
+22 -> Npixels350: number of pixels in the 350 microns aperture
+23 -> Npixels500: number of pixels in the 500 microns aperture
+24 -> sigma_inst250: instrumental error at 250 microns
+25 -> sigma_inst350: instrumental error at 350 microns
+26 -> sigma_inst500: instrumental error at 500 microns
+27 -> sigma_conf250: confusion error at 250 microns
+28 -> sigma_conf350: confusion error at 350 microns
+29 -> sigma_conf500: confusion error at 500 microns
+30 -> sigma_sky250: sky error at 250 microns
+31 -> sigma_sky350: sky error at 350 microns
+32 -> sigma_sky500: sky error at 500 microns
+33 -> Note to peculiar objects: see below. 
+
+
+* FLUX DENSITIES CALCULATION AND CORRECTIONS:
+---------------------------------------------
+
+=>For aperture photometry:
+Maps are in Jy/beam, in order to convert into mJy, we used:
+
+  S250(mJy)=fluxS(Jy/beam)*6.*6.*1000./423.*corrS
+  S350(mJy)=fluxM(Jy/beam)*8.*8.*1000./751.*corrM
+  S500(mJy)=fluxL(Jy/beam)*12.*12.*1000./1587.*corrL
+  
+  where corrS=0.98279
+  		corrM=0.98344*1.0067  (the 1.0067 factor comes from the HIPE version (5.0) that was used to create the maps)
+  		corrL=0.97099
+  
+  The pixel sizes are 6, 8 and 12"/pixel at 250, 350 and 500 microns.
+  The beam areas are 423, 751 and 1587 arcsec^2 at 250, 350 and 500 microns.
+  		
+These corrections are given by George Bendo in the "SPIRE Photometry Cookbook, July 2011"*.
+No color corrections have been applied.
+
+=>For timeline PSF fitting:
+Results are directly given by the program in Jy:
+
+  S250(mJy)=fluxS(Jy)*1000
+  S350(mJy)=fluxM(Jy)*1000
+  S500(mJy)=fluxL(Jy)*1000
+
+No colour corrections have been applied.	
+
+* APERTURE PHOTOMETRY:
+----------------------
+
+The standard galaxy aperture radius is 1.4*opt_r. However every single galaxy has been checked and, if needed, the aperture has been adapted (infrared emission more extended than optical emission, infrared emission faint and not extended (early types) compared to the optical shape, presence of a companion or a background source within the aperture.)
+
+The background is generally measured on a region defined as a circular annulus of inner radius 1.55*opt_r, with a 60" width. However, as for the apertures, we checked every single background region to avoid any kind of source contamination.  
+
+We used the DS9/Funtools package to perform photometry on elliptical apertures.
+The semi-major and semi-minor axis of the elliptical aperture are by default 1.4 those of the optical ellipticity, but have been adapted for several galaxies. For instance, there were cases where our aperture was smaller or bigger than the far infrared emission or, in other cases, the ellipticity of the galaxy was to small comparing to the resolution of the images and the semi-minor axis had to been adapted.
+
+
+
+* TIMELINE PSF FITTING:
+-----------------------
+
+We determined a list of point like candidates and, using the George Bendo's program on HIPE, we checked whether these galaxies were actually point like sources using the criteria that George provided in his "SPIRE Photometry Cookbook, July 2011"*. If the FHWM of the Gaussian fitted to the data is more than 20" at 250 microns, 29" at 350 microns and 37" at 500 microns, then the source is considered as extended.
+As a agreement between HRS and HeViCS (Herschel Virgo Cluster Survey), images of Virgo galaxies are cut off from the HeViCS fields.
+We have two sorts of images:
+1) HRS images: 1 timeline data. We run the fitter and take the result as the flux density of the galaxy.
+2) HeViCS cut off images: 8 timeline data, because HeViCS fields were observed 8 times. We run the fitter on the 8 timeline data all together and take the result as the flux density of the galaxy.
+
+As for extended sources, we multiply PMW data by 1.0067.
+
+* ERROR DETERMINATION:
+----------------------
+
+=> Extended sources:
+
+We calculate the errors on our flux density measurements according the formula:
+
+err_tot = sqrt( err_sky^2 + err_inst^2 + err_conf^2)
+
+where err_sky is the error on the sky determination, err_inst is the instrumental error and err_conf the confusion error.
+
+		The error on the sky determination
+		``````````````````````````````````
+		The uncertainty on the sky background comes from large-scale structures such as galactic cirri. 
+		They can contaminate the galaxy emission and/or the background determination.
+		To determine sigma_sky, the uncertainty on the background, we take 13x13 pixels boxes around the galaxy in the image map, we calculate the standard deviation of the mean value of the 	same boxes, according to Boselli et al. 2003.
+		The number of boxes depends on the size of the galaxy and on the size of the images but are about 16, 14 and 11 at 250, 350 and 500 microns.
+		
+		err_sky = N_aperture x sigma_sky
+
+		where N_aperture is the number of pixel within the aperture and sigma_sky is the uncertainty of the background.
+		
+		The instrumental error
+		``````````````````````
+		The instrumental error is the uncertainty due to the sensitivity of the instrument.
+		This noise is independent from pixel to pixel.
+
+		err_sky = sqrt(N_aperture x sigma_sky^2)
+
+		where N_aperture is the number of pixels within the aperture and sigma_sky is the uncertainty of the background.
+		
+		The confusion error				
+		```````````````````
+		The confusion error is the uncertainty due to the background sources (i.e. faint point-like sources) in the aperture. 
+		This confusion noise is problematic in our SPIRE images as the instrumental noise is less than or equivalent to the confusion noise.
+		This uncertainty is correlated between neighbouring pixels since the PSF includes several pixels.
+
+		err_sky = conf_lambda x sqrt(N_aperture x  pixelsize_lambda^2/beam_lambda)
+
+		where conf_lambda is the confusion noise estimated by Nguyen et al. 2010, i.e. 5.8, 6.3 and 6.8mJy/beam at 250, 350 and 500 microns respectively,
+		and pixelsize_lambda is the pixel size of the images in arcsecond,
+		and beam_lambda is the beam area in arcsecond^2.
+
+
+=> Point-like sources:
+
+Errors of point like sources are calculated by George Bendo. This was done by performing tests in which artificial point sources with the same flux density as the target were added to the timeline data at random locations within a 0.3 degree box centered on each source.  The artificial sources were then fit with the timeline-based source fitter using the same settings as were applied to each target galaxy.  100 iterations of adding artificial sources to the fields around each galaxy were performed, and the standard deviation of the flux densities of the artificial sources was used as the uncertainty in the flux density measurement of the target galaxy. 
+
+
+* UPPER LIMITS:
+---------------
+
+To define the aperture used for the determination of upper limits, we have formed 3 groups:
+First group: type E, (type 0)
+Second group: type S0, S0a, S0/Sa, (type 1-2)
+Third group: late types, (type > 2)
+
+=> For the first and the second group, we looked at the detected galaxies, and calculated the ratio between Spire photometric aperture and optical radius. We took the mean value of this ratio:
+   type E galaxies:  <r_IR/r_opt> = 0.3
+   type S0 galaxies: <r_IR/r_opt> = 0.8
+   For each undetected galaxies, we use a circular aperture with a radius of mean_ratio(type)*optical_radius to calculate the upper limit.
+=> For the third group, the late types, we used 1.4*opt_radius.
+=> For galaxies detected in a band, but not in the others, we take the radius of the circular aperture in the detected band to calculate the upper limit in the other bands.
+
+A minimum radius for upper_limits aperture has been set to 22.5", corresponding to the 500 microns beam size.
+
+Upper limits have been calculated using this formula:
+
+up_lim=3*sqrt( err_sky^2 + err_inst^2 + err_conf^2)
+
+
+
+* PARTICULAR CASES:
+-------------------
+
+HRS20: Presence of a companion galaxy; flux densities are overestimated.
+
+HRS45: Presence of a background source that cannot be separated at 250, 350 and 500 microns; flux densities are overestimated.
+
+HRS58: Presence of a background source that cannot be separated at 350 and 500 microns; flux densities are overestimated.
+
+HRS71: Presence of a strong cirrus.
+
+HRS103: Presence of a background source that cannot be separated at 350 and 500 microns; flux densities are overestimated.
+
+HRS129: The source is considered point like; however in the PLW band (500microns), even if we can see a detection, the emission of the galaxy is dominated by a background source. The HRS129 flux density at 500 microns is thus an upper limit.
+
+HRS142: Presence of a background source that cannot be separated at 250, 350 and 500 microns; flux densities are overestimated.
+
+HRS145: Presence of a background source that cannot be separated at 250, 350 and 500 microns; flux densities are overestimated.
+
+HRS187: NGC4496A. Presence of the companion NGC4496B. We removed the flux density emitted by the companion (we calculated the flux density of the companion and subtract it from the flux density emitted by the entire system)  and give in the table the flux densities of NGC4496A only. There are thus large uncertainties in the flux densities.
+
+HRS215, HRS216: The two galaxies are overlapping. Flux densities are overestimated, there are thus large uncertainties in the flux densities.
+
+HRS269: Presence of a strong cirrus.
+
+HRS278: Presence of a background source that can not be separated at 500 microns; flux densities are overestimated.
+
+================================================================================================================================================================
+* http://herschel.esac.esa.int/twiki/pub/Public/SpireCalibrationWeb/SPIREPhotometryCookbook_jul2011_2.pdf
