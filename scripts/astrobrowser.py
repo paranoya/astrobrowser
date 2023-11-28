@@ -58,30 +58,37 @@ def find_bg(data):
 #%% ----------------------------------------------------------------------------
 
 
-def aperture_photometry(hips_service_url, position, a, b, PA, skymap_units=None, desired_n_beams=100, fig=None):
+def aperture_photometry(hips_service_url, position, a, b, PA, skymap_units=None, beam=None, desired_n_beams=100, fig=None):
     """Download a HiPS cutout to compute flux and error for a specified elliptical aperture"""
 
     hips_properties = get_hips_proprties(hips_service_url)
     if hips_properties is None:
         return np.nan*u.mJy, np.nan*u.mJy
 
-    if 's_pixel_scale' in hips_properties:
-        original_pixel = float(hips_properties['s_pixel_scale']) * u.deg
-    elif 'hips_pixel_scale' in hips_properties:
-        original_pixel = float(hips_properties['hips_pixel_scale']) * u.deg
-        print(f'WARNING: original pixel size not available! using HiPS size = {original_pixel.to_value(u.arcsec)} arcsec')
+    if beam is None:
+        if 's_pixel_scale' in hips_properties:
+            original_pixel = float(hips_properties['s_pixel_scale']) * u.deg
+        elif 'hips_pixel_scale' in hips_properties:
+            original_pixel = float(hips_properties['hips_pixel_scale']) * u.deg
+            print(f'WARNING: original pixel size not available! using HiPS size = {original_pixel.to_value(u.arcsec)} arcsec')
+        else:
+            print('ERROR: neither original nor HiPS pixel sizes available!')
+            return np.nan*u.mJy, np.nan*u.mJy
+        beam = original_pixel**2
     else:
-        print('ERROR: neither original nor HiPS pixel sizes available!')
-        return np.nan*u.mJy, np.nan*u.mJy
+        original_pixel = np.sqrt(beam)
+        if 's_pixel_scale' in hips_properties:
+            original_pixel_properties = float(hips_properties['s_pixel_scale']) * u.deg
+            if not u.isclose(original_pixel, original_pixel_properties):
+                print(f'WARNING: {original_pixel} is different from {original_pixel_properties}')
 
-    beam = original_pixel**2
     if skymap_units is None:
         skymap_units = u.Jy / beam
     total_area = np.pi * a * b
     n_beams = float(total_area / beam)
     if n_beams > desired_n_beams:
         cutout_pixel = np.sqrt(total_area / desired_n_beams) / np.cos(position.dec)  # Mercator projection: pixel_area = cutout_pixel**2 * cos(DEC)
-        print('  cutout_pixel =', cutout_pixel)
+        #print('  cutout_pixel =', cutout_pixel)
     else:
         print(f'WARNING: (a, b)=({a.to_value(u.arcsec):.3g}, {b.to_value(u.arcsec):3g}) arcsec',
               f' => {n_beams} beams (original pixel={original_pixel.to_value(u.arcsec):.3g} arcsec) < {desired_n_beams} beams')
@@ -114,15 +121,15 @@ def aperture_photometry(hips_service_url, position, a, b, PA, skymap_units=None,
 
     pixel_area = cutout_pixel**2  * np.cos(position.dec)  # due to Mercator projection
     n_aperture = int(total_area/pixel_area)
-    src_threshold = np.sort(r2.flat)[n_aperture]
-    bg_threshold = np.sort(r2.flat)[3*n_aperture]
+    src_threshold = np.sort(r2.ravel())[n_aperture]
+    bg_threshold = np.sort(r2.ravel())[3*n_aperture]
     aperture = (r2 <= bg_threshold)
     bg_weight = np.where(np.isfinite(data) & ~aperture, 1., 0.)
     p16, p50, p84 = np.nanpercentile(data[~aperture], [16, 50, 84])
     bg_weight[np.abs((data - p50) / (p50-p16)) > 3] = 0
     bg_image = np.where(np.isfinite(data), bg_weight*data, 0.)
     
-    smoothing_radius = float(.5*b/cutout_pixel)
+    smoothing_radius = float(.25*(a+b)/cutout_pixel)
     bg_weight = ndimage.gaussian_filter(bg_weight, smoothing_radius)
     bg_image = ndimage.gaussian_filter(bg_image, smoothing_radius) / bg_weight
 
@@ -132,13 +139,14 @@ def aperture_photometry(hips_service_url, position, a, b, PA, skymap_units=None,
     original_std = np.nanstd(data[aperture])
     subtracted_mean = np.nanmean((data-bg_image)[aperture])
     subtracted_std = np.sqrt(np.nanmean((data-bg_image)[aperture & (data > bg_image + subtracted_mean)]**2))
-    mean_err = np.nanstd(data[aperture]) / np.sqrt(n_beams)
+    mean_err = np.nanstd(data[aperture]) / np.sqrt(max(1, n_beams))
     bg = np.nanmean(bg_image[aperture])
     bg_var = max(
         np.nanvar(bg_image[aperture]),
         np.nanmean((bg_image - data)[aperture & (bg_image > data)]**2)
     )
-    bg_err = np.sqrt(bg_var / np.sum(bg_weight[aperture]) * n_beams/n_aperture)
+    #bg_err = np.sqrt(bg_var / np.clip(np.sum(bg_weight[aperture]) * n_beams/n_aperture, 1, np.inf))
+    bg_err = np.sqrt(bg_var / max(1, np.sum(bg_weight[aperture])/np.pi/smoothing_radius**2))  # the "smoothed beam size" is ~ pi*smoothing_radius**2
     subtracted_err = np.sqrt(bg_err**2 + mean_err**2)
     #flux = np.nansum((data - bg_image)[aperture]) * unit_conversion_mJy
     #flux_err = n_aperture * subtracted_err * unit_conversion_mJy
