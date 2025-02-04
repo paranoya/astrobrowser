@@ -11,6 +11,7 @@ from astropy import units as u
 from photutils.aperture import SkyEllipticalAperture
 
 from time import time
+import os
 import requests
 import ipywidgets as widgets
 from IPython.display import display
@@ -58,52 +59,33 @@ def find_bg(data):
 #%% ----------------------------------------------------------------------------
 
 
-def aperture_photometry(hips_service_url, position, a, b, PA, skymap_units=None, beam=None, desired_n_beams=100, fig=None):
+def aperture_photometry(skymap, position, a, b, PA, desired_n_beams=1e4, cutout_file='', overwrite=False, fig=None):
     """Download a HiPS cutout to compute flux and error for a specified elliptical aperture"""
 
-    hips_properties = get_hips_proprties(hips_service_url)
-    if hips_properties is None:
-        return np.nan*u.mJy, np.nan*u.mJy
-
-    if beam is None:
-        if 's_pixel_scale' in hips_properties:
-            original_pixel = float(hips_properties['s_pixel_scale']) * u.deg
-        elif 'hips_pixel_scale' in hips_properties:
-            original_pixel = float(hips_properties['hips_pixel_scale']) * u.deg
-            print(f'WARNING: original pixel size not available! using HiPS size = {original_pixel.to_value(u.arcsec)} arcsec')
-        else:
-            print('ERROR: neither original nor HiPS pixel sizes available!')
-            return np.nan*u.mJy, np.nan*u.mJy
-        beam = original_pixel**2
-    else:
-        original_pixel = np.sqrt(beam)
-        if 's_pixel_scale' in hips_properties:
-            original_pixel_properties = float(hips_properties['s_pixel_scale']) * u.deg
-            if not u.isclose(original_pixel, original_pixel_properties):
-                print(f'WARNING: {original_pixel} is different from {original_pixel_properties}')
-
-    if skymap_units is None:
-        skymap_units = u.Jy / beam
+    print(f'> APERTURE photometry: (ra, dec) = ({position.ra.deg:.4f} {position.dec.deg:.4f}), (a, b)=({a.to_value(u.arcsec):.3g}, {b.to_value(u.arcsec):3g}) arcsec')
     total_area = np.pi * a * b
-    n_beams = float(total_area / beam)
-    if n_beams > desired_n_beams:
-        cutout_pixel = np.sqrt(total_area / desired_n_beams) / np.cos(position.dec)  # Mercator projection: pixel_area = cutout_pixel**2 * cos(DEC)
-        #print('  cutout_pixel =', cutout_pixel)
+    cutout_pixel = np.sqrt(total_area / desired_n_beams)
+    if cutout_pixel < skymap.hips_pixel:
+        cutout_pixel = skymap.hips_pixel
+        print(f'  WARNING: using HiPS pixel scale = {cutout_pixel.to_value(u.arcsec):.3g} arcsec')
+
+    unit_conversion_mJy = (skymap.intensity_units * total_area).to_value(u.mJy)
+
+    #print('xxx', overwrite, os.path.isfile(cutout_file))
+    if (overwrite) or (not os.path.isfile(cutout_file)):
+        print(f"- Downloading... (please be patient)")
+        header, data = get_cutout(skymap.url, position.ra.deg, position.dec.deg, 4*a.to_value(u.arcsec), cutout_pixel.to_value(u.arcsec), cutout_file, overwrite=overwrite)
+        if header is None:
+            return np.nan*u.mJy, np.nan*u.mJy
     else:
-        print(f'WARNING: (a, b)=({a.to_value(u.arcsec):.3g}, {b.to_value(u.arcsec):3g}) arcsec',
-              f' => {n_beams} beams (original pixel={original_pixel.to_value(u.arcsec):.3g} arcsec) < {desired_n_beams} beams')
-        cutout_pixel = float(hips_properties['hips_pixel_scale']) * u.deg
-        print(f'          using HiPS pixel scale = {cutout_pixel.to_value(u.arcsec):.3g} arcsec')
-
-    unit_conversion_mJy = (skymap_units * total_area).to_value(u.mJy)
-
-    print(f"> Downloading... (please be patient)")
-    header, data = get_cutout(hips_service_url, position.ra.deg, position.dec.deg, 4*a.to_value(u.arcsec), cutout_pixel.to_value(u.arcsec))
-    if header is None:
-        return np.nan*u.mJy, np.nan*u.mJy
-
+        print(f'- Reading "{cutout_file}"')
+        with fits.open(cutout_file) as hdu:
+            header = hdu[0].header
+            data = hdu[0].data
 
     # Aperture:
+    cutout_pixel = u.deg * np.sqrt(header['CDELT2'] * header['CDELT1'])
+    
     c = np.cos(PA)
     s = np.sin(PA)
     a_deg = a.to_value(u.deg)
@@ -121,39 +103,59 @@ def aperture_photometry(hips_service_url, position, a, b, PA, skymap_units=None,
 
     pixel_area = cutout_pixel**2  * np.cos(position.dec)  # due to Mercator projection
     n_aperture = int(total_area/pixel_area)
+    n_independent = float(total_area / max(pixel_area, skymap.beam))
+    print(f'- n_indep = {n_independent:.2f}/{n_aperture}, pixel = {pixel_area.to(u.arcsec**2):.2f}/{skymap.beam.to(u.arcsec**2):.2f}')
     src_threshold = np.sort(r2.ravel())[n_aperture]
     bg_threshold = np.sort(r2.ravel())[3*n_aperture]
+
+
+    # Background:
+
+    # mask inner region
     aperture = (r2 <= bg_threshold)
     bg_weight = np.where(np.isfinite(data) & ~aperture, 1., 0.)
+
+    # mask bright sources
     p16, p50, p84 = np.nanpercentile(data[~aperture], [16, 50, 84])
     bg_weight[np.abs((data - p50) / (p50-p16)) > 3] = 0
     bg_image = np.where(np.isfinite(data), bg_weight*data, 0.)
-    
+
+    # inpaint
     smoothing_radius = float(.25*(a+b)/cutout_pixel)
     bg_weight = ndimage.gaussian_filter(bg_weight, smoothing_radius)
     bg_image = ndimage.gaussian_filter(bg_image, smoothing_radius) / bg_weight
 
+    # measurement and errors
+    bg_mean = p50
+    bg_systematic = np.nanmean((bg_image[aperture]-p50)**2)
+    n_independent = len(np.unique(data[aperture])) * min(pixel_area/skymap.beam, 1)
+    bg_statistic = (p50 - p16)**2 / n_independent
+    bg_err = np.sqrt(bg_systematic + bg_statistic)
+    ''' OLD STUFF:
+    bg_mean = np.nanmean(bg_image[aperture])
+    bg_std = np.nanstd(bg_image[aperture]) # systematic
+    bg_err = np.sqrt(bg_std**2 + (p50 - p16)**2/n_independent)
+    '''
+    
+    # Source:
+    
+    # average over inner region
     aperture = (r2 < src_threshold)
-    n_aperture = np.count_nonzero(aperture)
     original_mean = np.nanmean(data[aperture])
     original_std = np.nanstd(data[aperture])
+    p16, p50 = np.nanpercentile(data[aperture], [16, 50])
+    mean_err = original_std / np.sqrt(n_independent)
+    #mean_err = (p50 - p16) / np.sqrt(n_independent)
+
+    # background subtraction
     subtracted_mean = np.nanmean((data-bg_image)[aperture])
-    subtracted_std = np.sqrt(np.nanmean((data-bg_image)[aperture & (data > bg_image + subtracted_mean)]**2))
-    mean_err = np.nanstd(data[aperture]) / np.sqrt(max(1, n_beams))
-    bg = np.nanmean(bg_image[aperture])
-    bg_var = max(
-        np.nanvar(bg_image[aperture]),
-        np.nanmean((bg_image - data)[aperture & (bg_image > data)]**2)
-    )
-    #bg_err = np.sqrt(bg_var / np.clip(np.sum(bg_weight[aperture]) * n_beams/n_aperture, 1, np.inf))
-    bg_err = np.sqrt(bg_var / max(1, np.sum(bg_weight[aperture])/np.pi/smoothing_radius**2))  # the "smoothed beam size" is ~ pi*smoothing_radius**2
     subtracted_err = np.sqrt(bg_err**2 + mean_err**2)
-    #flux = np.nansum((data - bg_image)[aperture]) * unit_conversion_mJy
-    #flux_err = n_aperture * subtracted_err * unit_conversion_mJy
+
+    # units
     flux = subtracted_mean * unit_conversion_mJy
     flux_err = subtracted_err * unit_conversion_mJy
-    
-    bg_std = np.sqrt(bg_var)
+
+    bg_norm = colors.Normalize(vmin=-3*subtracted_err, vmax=bg_mean+5*subtracted_err)
     if fig is not None:
         default_cmap = plt.get_cmap('terrain').copy()
         default_cmap.set_bad('gray')
@@ -161,9 +163,9 @@ def aperture_photometry(hips_service_url, position, a, b, PA, skymap_units=None,
 
         ax = axes[0, 0]
         ax.set_title(f'original: {original_mean:.4g} $\pm$ {mean_err:.3g} ({original_std:.3g})')
-        im = ax.imshow(data, interpolation='nearest', origin='lower', vmin=bg-3*bg_std, vmax=bg+6*bg_std, cmap=default_cmap)
+        im = ax.imshow(data, interpolation='nearest', origin='lower', norm=bg_norm, cmap=default_cmap)
         #im = ax.imshow(r2, interpolation='nearest', origin='lower', cmap=default_cmap)
-        ax.contour(r2, levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
+        ax.contour(r2.to_value(u.dimensionless_unscaled), levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
         cb = plt.colorbar(im, ax=ax, shrink=.7)
         cb.ax.tick_params(labelsize='small')
         cb.ax.axhline(original_mean+original_std, c='k', ls=':')
@@ -172,24 +174,26 @@ def aperture_photometry(hips_service_url, position, a, b, PA, skymap_units=None,
         
         ax = axes[0, 1]
         #ax.set_title(f'background: [{p16:.4g}, {p50:.4g}, {p84:.4g}]')
-        ax.set_title(f'background: {bg:.3g} $\pm$ {bg_err:.3g} ({bg_std:.3g})')
-        im = ax.imshow(bg_image, interpolation='nearest', origin='lower', vmin=bg-3*bg_std, vmax=bg+6*bg_std, cmap=default_cmap)
-        ax.contour(r2, levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
+        ax.set_title(f'background: {bg_mean:.3g} $\pm$ {bg_err:.3g}')
+        im = ax.imshow(bg_image, interpolation='nearest', origin='lower', norm=bg_norm, cmap=default_cmap)
+        #ax.contour(r2, levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
+        ax.contour(r2.to_value(u.dimensionless_unscaled), levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
         cb = plt.colorbar(im, ax=ax, shrink=.7)
         cb.ax.tick_params(labelsize='small')
-        cb.ax.axhline(bg + bg_std, c='w', ls=':')
-        cb.ax.axhline(bg, c='w', ls='-')
-        cb.ax.axhline(bg - bg_std, c='w', ls=':')
+        cb.ax.axhline(bg_mean + bg_err, c='w', ls=':')
+        cb.ax.axhline(bg_mean, c='w', ls='-')
+        cb.ax.axhline(bg_mean - bg_err, c='w', ls=':')
 
         ax = axes[0, 2]
-        ax.set_title(f'subtracted {subtracted_mean:.4g} $\pm$ {subtracted_err:.3g} ({subtracted_std:.3g})')
-        im = ax.imshow(data - bg_image, interpolation='nearest', origin='lower', cmap=default_cmap, vmin=-3*bg_std, vmax=6*bg_std)#, vmin=bg-bg_err, vmax=mean+bg_err)
-        ax.contour(r2, levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
+        ax.set_title(f'subtracted {subtracted_mean:.4g} $\pm$ {subtracted_err:.3g}')
+        im = ax.imshow(data - bg_image, interpolation='nearest', origin='lower', norm=bg_norm, cmap=default_cmap)
+        #ax.contour(r2, levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
+        ax.contour(r2.to_value(u.dimensionless_unscaled), levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
         cb = plt.colorbar(im, ax=ax, shrink=.7)
         cb.ax.tick_params(labelsize='small')
-        cb.ax.axhline(subtracted_std, c='k', ls=':')
+        cb.ax.axhline(subtracted_err, c='k', ls=':')
         cb.ax.axhline(subtracted_mean, c='k')
-        cb.ax.axhline(bg_std, c='w', ls=':')
+        cb.ax.axhline(bg_err, c='w', ls=':')
         
     #return corrected_flux, flux_err
     return flux*u.mJy, flux_err*u.mJy
@@ -231,29 +235,32 @@ def get_available_images(ra_deg, dec_deg, radius_deg, max_pixel_deg=np.inf):
 #%% ----------------------------------------------------------------------------
 
 
-def get_cutout(hips_service_url, ra_deg, dec_deg, radius_arcsec, pixel_arcsec):
+def get_cutout(hips_service_url, ra_deg, dec_deg, radius_arcsec, pixel_arcsec, save_file='', overwrite=False):
     """Retrieve a cutout from a public HiPS map"""
 
-    print(f"http://localhost:4000/api/cutout?"
-                    +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
-                    +f"&radeg={ra_deg}&decdeg={dec_deg}"
-                    +f"&hipsbaseuri={hips_service_url}")
-    with conf.set_temp('remote_timeout', 10):
+    url = "http://localhost:4000"
+    #url = "http://astrobrowser.ft.uam.es"
+    url += f"/api/cutout?hipsbaseuri={hips_service_url}"
+    url += f"&radeg={ra_deg}&decdeg={dec_deg}"
+    url += f"&radiusasec={radius_arcsec:.2f}&pxsizeasec={pixel_arcsec:.2f}"
+    print(url)
+    with conf.set_temp('remote_timeout', 300):
         try:
-            hdu = fits.open(f"http://localhost:4000/api/cutout?"
-                        +f"radiusasec={radius_arcsec}&pxsizeasec={pixel_arcsec}"
-                        +f"&radeg={ra_deg}&decdeg={dec_deg}"
-                        +f"&hipsbaseuri={hips_service_url}",
-                        ignore_missing_simple=True, mode='readonly')
+            hdu = fits.open(url, ignore_missing_simple=True, mode='readonly')
         except:
             print('ERROR: could not download cutout (most likely, timeout) :^(')
-            hdu = None
-    if hdu is None:
-        return None, None
-    else:
+            return None, None
+    if save_file != '':
+        print(f'  Saving "{save_file}"')
         #hdu[0].verify('fix')
-        #print('\n---\n', hdu[0].header)
-        return hdu[0].header, hdu[0].data
+        #try:
+        #    hdu[0].verify('silentfix')
+        #except:
+        #    print('WARNING: something was really wrong in the header!')
+        #    hdu[0].verify('ignore')
+        #print(hdu[0].header)
+        fits.PrimaryHDU(header=hdu[0].header, data=hdu[0].data).writeto(save_file, overwrite=overwrite, output_verify='fix')
+    return hdu[0].header, hdu[0].data
 
 #%% ----------------------------------------------------------------------------
 
