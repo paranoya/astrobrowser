@@ -238,8 +238,8 @@ def get_available_images(ra_deg, dec_deg, radius_deg, max_pixel_deg=np.inf):
 def get_cutout(hips_service_url, ra_deg, dec_deg, radius_arcsec, pixel_arcsec, save_file='', overwrite=False):
     """Retrieve a cutout from a public HiPS map"""
 
-    url = "http://localhost:4000"
-    #url = "http://astrobrowser.ft.uam.es"
+    #url = "http://localhost:4000"
+    url = "http://astrobrowser.ft.uam.es"
     url += f"/api/cutout?hipsbaseuri={hips_service_url}"
     url += f"&radeg={ra_deg}&decdeg={dec_deg}"
     url += f"&radiusasec={radius_arcsec:.2f}&pxsizeasec={pixel_arcsec:.2f}"
@@ -247,6 +247,9 @@ def get_cutout(hips_service_url, ra_deg, dec_deg, radius_arcsec, pixel_arcsec, s
     with conf.set_temp('remote_timeout', 300):
         try:
             hdu = fits.open(url, ignore_missing_simple=True, mode='readonly')
+            # TODO: fix this properly in WCSlight
+            hdu[0].header['cdelt1'] = -hdu[0].header['cdelt1']
+            hdu[0].data = hdu[0].data[:, ::-1]
         except:
             print('ERROR: could not download cutout (most likely, timeout) :^(')
             return None, None
