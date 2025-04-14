@@ -1,0 +1,44 @@
+Title: SPARC. I. Mass Models for 175 Disk Galaxies with
+       Spitzer Photometry and Accurate Rotation Curves
+Authors: Federico Lelli, Stacy S. McGaugh and James M. Schombert
+Table: Galaxy Sample
+================================================================================
+Byte-by-byte Description of file: Table1.mrt
+--------------------------------------------------------------------------------
+   Bytes Format Units         Label   Explanations
+--------------------------------------------------------------------------------
+   1- 11 A11    ---           Galaxy  Galaxy Name
+  12- 14 I3     ---           T       Hubble Type (1)
+  15- 21 F7.2   Mpc           D       Distance
+  22- 27 F6.2   Mpc         e_D       Mean error on D
+  28- 30 I3     ---         f_D       Distance Method (2)
+  31- 35 F5.1   deg           Inc     Inclination
+  36- 40 F5.1   deg         e_Inc     Mean error on Inc
+  41- 48 F8.3   10+9solLum    L[3.6]  Total Luminosity at [3.6]
+  49- 56 F8.3   10+9solLum  e_L[3.6]  Mean error on L[3.6]
+  57- 62 F6.2   kpc           Reff    Effective Radius at [3.6]
+  63- 71 F9.2   solLum/pc2    SBeff   Effective Surface Brightness at [3.6]
+  72- 77 F6.2   kpc           Rdisk   Disk Scale Length at [3.6]
+  78- 86 F9.2   solLum/pc2    SBdisk  Disk Central Surface Brightness at [3.6]
+  87- 94 F8.3   10+9solMass   MHI     Total HI mass
+  95-100 F6.2   kpc           RHI     HI radius at 1 Msun/pc2
+ 101-106 F6.1   km/s          Vflat   Asymptotically Flat Rotation Velocity
+ 107-112 F6.1   km/s        e_Vflat   Mean error on Vflat
+ 113-116 I4     ---           Q       Quality Flag (3)
+ 117-131 A15    ---           Ref.    References for HI and Ha data (4)
+--------------------------------------------------------------------------------
+Note (1):
+ 0 = S0,  1 = Sa, 2 = Sab, 3 = Sb, 4 = Sbc, 5 = Sc,
+ 6 = Scd, 7 = Sd, 8 = Sdm, 9 = Sm, 10 = Im, 11 = BCD
+Note (2):
+ 1 = Hubble-Flow assuming H0=73 km/s/Mpc and correcting for Virgo-centric infall
+ 2 = Magnitude of the Tip of the Red Giant Branch
+ 3 = Cepheids Magnitude-Period Relation
+ 4 = Ursa Major Cluster of Galaxies
+ 5 = Supernovae Light Curve
+Note (3):
+ 1 = High, 2 = Medium, 3 = Low
+Note (4):
+ SG06 = Spekkens, K. & Giovanelli, R. 2006, AJ, 132, 1426
+--------------------------------------------------------------------------------
+    NGC6195  3 127.80 12.80  1 62.0  5.0 391.076   6.123  9.52   686.80 13.94   174.11  20.907 40.89 251.7   9.3   1           SG06

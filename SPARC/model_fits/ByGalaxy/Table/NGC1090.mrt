@@ -1,0 +1,46 @@
+# Title: A comprehensive catalog of dark matter halo models for SPARC galaxies
+# Authors: P. Li, F. Lelli, S. McGaugh, J. Schombert
+# Table: The best-fit parameters for each individual galaxy.
+# ================================================================================
+# Byte-by-byte Description of file: datafile.txt
+# --------------------------------------------------------------------------------
+#    Bytes Format Units            Label      Explanations
+# --------------------------------------------------------------------------------
+#    1- 14 I14    ---              Model      Dark matter halo profile
+#   15- 19 F5.2   ---              Ydisk      Stellar mass-to-light ratio for disks
+#   20- 24 F5.2   ---            e_Ydisk      Error on Ydisk
+#   25- 29 F5.2   ---              Ybul       Stellar mass-to-light ratio for bulges
+#   30- 34 F5.2   ---            e_Ybul       Error on Ybul
+#   35- 40 F6.2   Mpc              D          Galaxy distance
+#   41- 45 F5.2   Mpc            e_D          Error on galaxy distance
+#   46- 50 F5.1   deg.             inc        Disk inclination
+#   51- 55 F5.1   deg.           e_inc        Error on disk inclination
+#   56- 62 F7.2   km/s             V200       Rotation velocity at r200 (1)
+#   63- 68 F6.2   km/s           e_V200       Error on V200
+#   69- 75 F7.2   ---              C200       Halo concentration (1)
+#   76- 82 F7.2F  ---            e_C200       Error on halo concentration
+#   83- 89 F7.2   kpc              rs         Halo scale radius
+#   90- 96 F7.2   kpc            e_rs         Error on rs
+#   97-102 F6.2   [solMass/pc^3]   log(rhos)  Volume density of dark matter halos
+#  103-108 F6.2   [solMass/pc^3] e_log(rhos)  Error on log(rhos)
+#  109-114 F6.2   [solMass]        log(M200)  Halo mass (1)
+#  115-119 F5.2   [solMass]      e_log(M200)  Error on halo mass
+#  120-124 F5.2F  ---              alpha      Shape parameter for the Einasto model
+#  125-129 F5.2   ---            e_alpha      Error on alpha
+#  130-135 F6.2   ---              Chi        Reduced Chi^2
+# --------------------------------------------------------------------------------
+# Note (1):   Defined at r200, the radius where the dark matter density
+#     is 200 times the critical density of the Universe.
+# --------------------------------------------------------------------------------
+     pISO-Flat  0.53  0.10  0.00  0.00  30.37  6.18  63.7   3.0  147.40   5.36   96.42   35.18    2.09    0.77  -1.03   0.51  12.01  0.05  0.00  0.00   1.54
+  Burkert-Flat  0.36  0.09  0.00  0.00  24.77  8.29  63.0   3.0   89.86   7.83   39.34   19.13    3.13    1.55  -0.69   0.66  11.36  0.11  0.00  0.00   1.41
+      NFW-Flat  0.51  0.10  0.00  0.00  31.90  6.61  63.5   3.0  113.10   7.60   10.78    4.01   14.37    5.43  -2.10   0.51  11.66  0.09  0.00  0.00   2.73
+      NFW-LCDM  0.54  0.10  0.00  0.00  32.52  4.89  63.9   2.9  117.06   6.85    9.11    2.14   17.61    4.27  -2.28   0.33  11.71  0.08  0.00  0.00   2.77
+  Einasto-Flat  0.43  0.11  0.00  0.00  24.03  7.32  63.8   3.0   77.69   8.45   16.77    5.05    6.35    2.03  -1.91   0.44  11.17  0.14  0.42  0.06   2.77
+  Einasto-LCDM  0.51  0.13  0.00  0.00  29.32  5.05  62.7   3.1  102.76  10.55   11.73    3.08   12.00    3.39  -2.52   0.39  11.54  0.13  0.27  0.04   2.77
+     DC14-Flat  0.43  0.11  0.00  0.00   8.49  2.60  63.8   3.1   85.76   4.77  126.07   53.78    0.93    0.40   0.08   0.42  11.30  0.07  0.00  0.00   0.84
+     DC14-LCDM  0.69  0.12  0.00  0.00  25.74  3.18  63.5   3.0  127.66   8.98   10.20    3.25   17.15    5.60  -2.23   0.33  11.82  0.09  0.00  0.00   3.09
+  coreNFW-Flat  0.52  0.11  0.00  0.00  39.23  8.11  63.8   3.0  105.76  10.38   10.75   24.34   13.48   30.56  -2.10   3.00  11.58  0.13  0.00  0.00   2.33
+  coreNFW-LCDM  0.64  0.12  0.00  0.00  34.75  5.29  63.6   2.9  116.53   7.29    7.78    1.52   20.52    4.21  -2.44   0.28  11.70  0.08  0.00  0.00   2.44
+  Lucky13-Flat  0.42  0.10  0.00  0.00  23.11  7.30  63.2   3.0   95.28   7.71   49.20   22.87    2.65    1.25  -0.32   0.63  11.44  0.11  0.00  0.00   1.26
+  Lucky13-LCDM  0.52  0.11  0.00  0.00  40.04  5.30  63.5   2.9  112.44   6.74   16.38    4.70    9.40    2.76  -1.53   0.40  11.66  0.08  0.00  0.00   2.16
