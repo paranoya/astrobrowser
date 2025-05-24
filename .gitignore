@@ -1,5 +1,8 @@
 HRS/output
 SPARC/output
+# piped stdout/stderr
+*.out
+*.err
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
