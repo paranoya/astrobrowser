@@ -244,7 +244,7 @@ def get_cutout(hips_service_url, ra_deg, dec_deg, radius_arcsec, pixel_arcsec, s
     url += f"&radeg={ra_deg}&decdeg={dec_deg}"
     url += f"&radiusasec={radius_arcsec:.2f}&pxsizeasec={pixel_arcsec:.2f}"
     print(url)
-    with conf.set_temp('remote_timeout', 300):
+    with conf.set_temp('remote_timeout', 1000):
         try:
             hdu = fits.open(url, ignore_missing_simple=True, mode='readonly')
             # TODO: fix this properly in WCSlight
