@@ -1,5 +1,4 @@
-HRS/output
-SPARC/output
+*output
 # piped stdout/stderr
 *.out
 *.err
