@@ -9,6 +9,7 @@ from astropy.table import Table
 from astropy.utils.data import conf
 from astropy import units as u
 from photutils.aperture import SkyEllipticalAperture
+from mocpy import MOC
 
 from time import time
 import os
@@ -19,7 +20,7 @@ from IPython.display import display
 #%% -----------------------------------------------------------------------------
 
 
-def get_hips_proprties(hips_service_url):
+def get_hips_properties(hips_service_url):
     '''Get HiPS properties ;^D'''
     
     with conf.set_temp('remote_timeout', 10):
@@ -33,7 +34,7 @@ def get_hips_proprties(hips_service_url):
             return properties
         except:
             print(f'ERROR: could not get HiPS properties for {hips_service_url}')
-            return None  # get_hips_proprties(hips_service_url)  # or try again... Dangerous!
+            return None  # get_hips_properties(hips_service_url)  # or try again... Dangerous!
 
 #%% ----------------------------------------------------------------------------
 
@@ -59,12 +60,12 @@ def find_bg(data):
 #%% ----------------------------------------------------------------------------
 
 
-def aperture_photometry(skymap, position, a, b, PA, desired_n_beams=1e4, cutout_file='', overwrite=False, fig=None):
+def aperture_photometry(skymap, position, a, b, PA, desired_n_independent=1e4, cutout_file='', overwrite=False, fig=None):
     """Download a HiPS cutout to compute flux and error for a specified elliptical aperture"""
 
     print(f'> APERTURE photometry: (ra, dec) = ({position.ra.deg:.4f} {position.dec.deg:.4f}), (a, b)=({a.to_value(u.arcsec):.3g}, {b.to_value(u.arcsec):3g}) arcsec')
     total_area = np.pi * a * b
-    cutout_pixel = np.sqrt(total_area / desired_n_beams)
+    cutout_pixel = np.sqrt(total_area / desired_n_independent)
     if cutout_pixel < skymap.hips_pixel:
         cutout_pixel = skymap.hips_pixel
         print(f'  WARNING: using HiPS pixel scale = {cutout_pixel.to_value(u.arcsec):.3g} arcsec')
@@ -102,9 +103,10 @@ def aperture_photometry(skymap, position, a, b, PA, desired_n_beams=1e4, cutout_
     r2 += ((x[np.newaxis, :]*b_x + y[:, np.newaxis]*b_y) / b_pix2)**2
 
     pixel_area = cutout_pixel**2  * np.cos(position.dec)  # due to Mercator projection
+    original_area = skymap.original_pixel**2
     n_aperture = int(total_area/pixel_area)
-    n_independent = float(total_area / max(pixel_area, skymap.beam))
-    print(f'- n_indep = {n_independent:.2f}/{n_aperture}, pixel = {pixel_area.to(u.arcsec**2):.2f}/{skymap.beam.to(u.arcsec**2):.2f}')
+    n_independent = float(total_area / max(pixel_area, original_area))
+    print(f'- n_indep = {n_independent:.2f}/{n_aperture}, pixel = {pixel_area.to(u.arcsec**2):.2f}/{original_area.to(u.arcsec**2):.2f}')
     src_threshold = np.sort(r2.ravel())[n_aperture]
     bg_threshold = np.sort(r2.ravel())[3*n_aperture]
 
@@ -128,7 +130,7 @@ def aperture_photometry(skymap, position, a, b, PA, desired_n_beams=1e4, cutout_
     # measurement and errors
     bg_mean = p50
     bg_systematic = np.nanmean((bg_image[aperture]-p50)**2)
-    n_independent = len(np.unique(data[aperture])) * min(pixel_area/skymap.beam, 1)
+    n_independent = len(np.unique(data[aperture])) * min(pixel_area/original_area, 1)
     bg_statistic = (p50 - p16)**2 / n_independent
     bg_err = np.sqrt(bg_systematic + bg_statistic)
     ''' OLD STUFF:
@@ -162,7 +164,7 @@ def aperture_photometry(skymap, position, a, b, PA, desired_n_beams=1e4, cutout_
         axes = fig.subplots(nrows=1, ncols=3, squeeze=False)
 
         ax = axes[0, 0]
-        ax.set_title(f'original: {original_mean:.4g} $\pm$ {mean_err:.3g} ({original_std:.3g})')
+        ax.set_title(f'original: {original_mean:.4g} $\\pm$ {mean_err:.3g} ({original_std:.3g})')
         im = ax.imshow(data, interpolation='nearest', origin='lower', norm=bg_norm, cmap=default_cmap)
         #im = ax.imshow(r2, interpolation='nearest', origin='lower', cmap=default_cmap)
         ax.contour(r2.to_value(u.dimensionless_unscaled), levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
@@ -174,7 +176,7 @@ def aperture_photometry(skymap, position, a, b, PA, desired_n_beams=1e4, cutout_
         
         ax = axes[0, 1]
         #ax.set_title(f'background: [{p16:.4g}, {p50:.4g}, {p84:.4g}]')
-        ax.set_title(f'background: {bg_mean:.3g} $\pm$ {bg_err:.3g}')
+        ax.set_title(f'background: {bg_mean:.3g} $\\pm$ {bg_err:.3g}')
         im = ax.imshow(bg_image, interpolation='nearest', origin='lower', norm=bg_norm, cmap=default_cmap)
         #ax.contour(r2, levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
         ax.contour(r2.to_value(u.dimensionless_unscaled), levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
@@ -185,7 +187,7 @@ def aperture_photometry(skymap, position, a, b, PA, desired_n_beams=1e4, cutout_
         cb.ax.axhline(bg_mean - bg_err, c='w', ls=':')
 
         ax = axes[0, 2]
-        ax.set_title(f'subtracted {subtracted_mean:.4g} $\pm$ {subtracted_err:.3g}')
+        ax.set_title(f'subtracted {subtracted_mean:.4g} $\\pm$ {subtracted_err:.3g}')
         im = ax.imshow(data - bg_image, interpolation='nearest', origin='lower', norm=bg_norm, cmap=default_cmap)
         #ax.contour(r2, levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
         ax.contour(r2.to_value(u.dimensionless_unscaled), levels=[src_threshold, bg_threshold], colors=['k', 'k'], linestyles=['-', ':'])
@@ -205,9 +207,14 @@ def get_available_images(ra_deg, dec_deg, radius_deg, max_pixel_deg=np.inf):
     """Query the CDS MOC server to find out what images with the requested resolution are available within the field of view"""
     
     #data = requests.get(f"http://alasky.cds.unistra.fr/MocServer/query?RA={radeg}&DEC={decdeg}&SR={radiusdeg}")
-    data = requests.get(f"http://alasky.cds.unistra.fr/MocServer/query?RA={ra_deg}&DEC={dec_deg}&SR={radius_deg}"
-                        +"&expr=(hips_frame%3Dequatorial%2Cgalactic%2Cecliptic+||+hips_frame%3D!*)"
-                        +"+%26%26+dataproduct_type%3Dimage+%26%26+hips_service_url%3D*&get=record")
+    #data = requests.get(f"http://alasky.cds.unistra.fr/MocServer/query?RA={ra_deg}&DEC={dec_deg}&SR={radius_deg}"
+    #                    +"&expr=(hips_frame%3Dequatorial%2Cgalactic%2Cecliptic+||+hips_frame%3D!*)"
+    #                    +"+%26%26+dataproduct_type%3Dimage+%26%26+hips_service_url%3D*&get=record")
+    url = f"http://alasky.cds.unistra.fr/MocServer/query?RA={ra_deg}&DEC={dec_deg}&SR={radius_deg}"
+    url += "&expr=(hips_frame%3Dequatorial%2Cgalactic%2Cecliptic+||+hips_frame%3D!*)"
+    url += "+%26%26+dataproduct_type%3Dimage+%26%26+hips_service_url%3D*&get=record"
+    print('> ---\n', url, '\n> ---')
+    data = requests.get(url)
     # TODO: process the request, handle errors, and such...
 
     # or just assume everything's fine ;^D
@@ -450,6 +457,93 @@ class DataExplorer(object):
         ax.contour(weight, levels=[.01], colors=['k'])
         ax.contour(index, levels=np.arange(np.max(index)), colors=['w'], alpha=.5)
         '''
+
+#%% ----------------------------------------------------------------------------
+
+
+class HiPS_skymap(object):
+    
+    def __init__(self, hips_service_url, units, original_pixel=None):
+        '''Intensity map in Hierarchical Progressive Survey (HiPS) format'''
+        
+        print(f'> {hips_service_url}')
+        self.url = hips_service_url
+        self.properties = get_hips_properties(hips_service_url)
+        if self.properties is None:
+            print('  ERROR: HiPS properties not available!')
+            raise -1
+        if 'hips_pixel_scale' in self.properties:
+            self.hips_pixel = float(self.properties['hips_pixel_scale']) * u.deg
+        else:
+            print('  ERROR: HiPS pixel size not available!')
+            raise -1
+        self.moc = MOC.from_fits(f'{hips_service_url}/Moc.fits')
+        
+        if original_pixel is None:
+            if 's_pixel_scale' in self.properties:
+                self.original_pixel = float(self.properties['s_pixel_scale']) * u.deg
+            else:
+                self.original_pixel = self.hips_pixel
+                print(f'  WARNING: original pixel size not available! using HiPS size = {self.hips_pixel.to_value(u.arcsec)} arcsec')
+        else:
+            if 's_pixel_scale' in self.properties:
+                self.original_pixel = original_pixel
+                original_pixel_properties = float(self.properties['s_pixel_scale']) * u.deg
+                if not u.isclose(original_pixel, original_pixel_properties):
+                    print(f'  WARNING: {original_pixel} is different from {original_pixel_properties} ({original_pixel_properties.to(original_pixel.unit)})')
+
+        self.intensity_units = units
+        if u.get_physical_type(units) == 'spectral flux density':
+            self.intensity_units = units / self.original_pixel**2
+        
+        print(f'  HiPS pixel = {self.hips_pixel.to(u.arcsec):.4f}, original = {self.original_pixel.to(u.arcsec):.4f}',
+              f'; units = {self.intensity_units.to(u.uJy/u.arcsec**2):.2f} = {self.intensity_units.to(u.MJy/u.sr):.4f}')
+
+#%% ----------------------------------------------------------------------------
+
+
+def fectch_target_cutouts(target, skymaps, maps_dir, overwrite=False, fig_dir=None):
+    """
+    Call the AstroBrowser to download HiPS cutouts, or
+    read them from disk if they are present.
+    """
+    print('---------------------------------------------------------------')
+    header = {}
+    data = {}
+    for band in skymaps:
+        cutout_file = os.path.join(maps_dir, f"{target['ID']}_{band}.fits")
+        if overwrite or not os.path.isfile(cutout_file):
+            print(f"- Downloading {cutout_file}... (please be patient)")
+            header[band], data[band] = get_cutout(
+                skymaps[band].url,
+                target['RA_DEG'], target['DEC_DEG'],
+                target['RADIUS_ARCSEC'], target['PIXEL_SIZE_ARCSEC'],
+                cutout_file, overwrite=True)
+            if header[band] is None:
+                for bnd in skymaps:
+                    header[bnd] = None
+                    data[bnd] = None
+                return header, data
+        else:
+            print(f'- Reading "{cutout_file}"')
+            with fits.open(cutout_file) as hdu:
+                header[band] = hdu[0].header
+                data[band] = hdu[0].data
+
+    if fig_dir is not None and header[next(iter(header))] is not None:
+        n_bands = len(data)
+        fig = plt.figure('cutouts', figsize=(6*n_bands, 5))
+        for idx, band in enumerate(data):
+            wcs = WCS(header[band])
+            ax = fig.add_subplot(1, n_bands, idx+1)#, projection=wcs)
+            ax.set_title(band)
+            img = -2.5*np.log10(data[band] * skymaps[band].intensity_units.to_value(3631*u.Jy/u.arcsec**2))
+            im = ax.imshow(img, origin='lower', interpolation='nearest', cmap='nipy_spectral', norm=colors.Normalize(17.5, 26.5))
+            cb = plt.colorbar(im, ax=ax, shrink=.9)
+        fig.savefig(os.path.join(fig_dir, f'{target['ID']}_cutouts.png'), facecolor='white')
+        plt.close('cutouts')
+
+    return header, data
 
 #%% ----------------------------------------------------------------------------
 #                                                        ... Paranoy@ Rulz! ;^D
