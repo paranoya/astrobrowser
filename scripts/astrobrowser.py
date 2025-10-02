@@ -502,7 +502,7 @@ class HiPS_skymap(object):
 #%% ----------------------------------------------------------------------------
 
 
-def fectch_target_cutouts(target, skymaps, maps_dir, overwrite=False, fig_dir=None):
+def fetch_target_cutouts(target, skymaps, maps_dir, overwrite=False, fig_dir=None):
     """
     Call the AstroBrowser to download HiPS cutouts, or
     read them from disk if they are present.
